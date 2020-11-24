@@ -53,9 +53,9 @@ int main(int argc, char *argv[]) {
 
   for(int i = 0; i < DEFAULT_NAME_COUNT; i++) {
     generate_name(&first_name, &last_name);
-    fwrite(first_name, sizeof(char), FIRST_NAME_LEN, file);
     fwrite(last_name, sizeof(char), LAST_NAME_LEN, file);
-    printf("%s %s\n", first_name, last_name);
+    fwrite(first_name, sizeof(char), FIRST_NAME_LEN, file);
+    printf("%s %s\n", last_name, first_name);
   }
 
   fclose(file);

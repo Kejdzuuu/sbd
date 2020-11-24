@@ -323,7 +323,6 @@ Tape * merge_tapes(Tape *tape1, Tape *tape2)
 	}
 
 	Tape *new_tape = (Tape *)calloc(1, sizeof(Tape));
-	printf("%d tape alloc\n", new_tape);
 	tape_allocs++;
 	new_tape->first = merge_runs(tape1->first, tape2->first);
 	tape1->first = tape1->first->next;
@@ -354,17 +353,17 @@ void print_out_file()
 	while (1) {
 		int read_bytes;
 
-		read_bytes = fread(f_name, sizeof(char), FIRST_NAME_LEN, file);
-		if (!read_bytes) {
-			break;
-		}
-
 		read_bytes = fread(l_name, sizeof(char), LAST_NAME_LEN, file);
 		if (!read_bytes) {
 			break;
 		}
 
-		printf("%s %s\n", f_name, l_name);
+		read_bytes = fread(f_name, sizeof(char), FIRST_NAME_LEN, file);
+		if (!read_bytes) {
+			break;
+		}
+
+		printf("%s %s\n", l_name, f_name);
 	}
 
 	free(f_name);
@@ -387,12 +386,12 @@ Tape * load_file() {
 		f_name[FIRST_NAME_LEN] = '\0';
 		l_name[LAST_NAME_LEN] = '\0';
 
-		read_bytes = fread(f_name, sizeof(char), FIRST_NAME_LEN, file);
+		read_bytes = fread(l_name, sizeof(char), LAST_NAME_LEN, file);
 		if (!read_bytes) {
 			break;
 		}
 
-		read_bytes = fread(l_name, sizeof(char), LAST_NAME_LEN, file);
+		read_bytes = fread(f_name, sizeof(char), FIRST_NAME_LEN, file);
 		if (!read_bytes) {
 			break;
 		}
@@ -402,6 +401,32 @@ Tape * load_file() {
 
 	fclose(file);
 	return t1;
+}
+
+void save_tape_to_file(Tape *tape) {
+  FILE *file;
+  file = fopen("test", "w");
+  char *string = (char *)calloc(FIRST_NAME_LEN + 1, sizeof(char));
+  string[FIRST_NAME_LEN] = '\0';
+
+  Run *current_run = tape->first;
+  Value *current_value = current_run->first;
+
+  while (current_run != NULL) {
+    current_value = current_run->first;
+    while (current_value != NULL) {
+      memset (string, 0, FIRST_NAME_LEN);
+      strcpy (string, current_value->last_name);
+      fwrite (string, sizeof(char), LAST_NAME_LEN, file);
+      memset (string, 0, FIRST_NAME_LEN);
+      strcpy (string, current_value->first_name);
+      fwrite (string, sizeof(char), FIRST_NAME_LEN, file);
+      current_value = current_value->next;
+    }
+    current_run = current_run->next;
+  }
+
+  fclose(file);
 }
 
 int main()
@@ -417,67 +442,7 @@ int main()
     printf("%d sorts:\n", num);
 	  print_tape(tape);
   }
-  //print_tape(tape);
-	/*Tape *t1 = (Tape*)calloc(1, sizeof(Tape));
-	Tape *t2 = (Tape*)calloc(1, sizeof(Tape));
-	Tape *t3 = (Tape*)calloc(1, sizeof(Tape));
-	printf("%d tape alloc\n", t1);
-	printf("%d tape alloc\n", t2);
-	printf("%d tape alloc\n", t3);
-	tape_allocs+=3;
-
-	char *f1 = "jan";
-	char *f2 = "dan";
-	char *f3 = "man";
-	char *f4 = "kan";
-	char *f5 = "man";
-	char *l1 = "nowak";
-	char *l2 = "nowak";
-	char *l3 = "aronia";
-	char *l4 = "kowalski";
-	char *l5 = "kowalski";
-	char *l6 = "aronia";
-	char *l7 = "aronia";
-
-	add_name(t1, l1, f1);
-	add_name(t1, l2, f2);
-	add_name(t1, l3, f3);
-	add_name(t1, l4, f4);
-	add_name(t1, l5, f5);
-	add_name(t1, l6, f4);
-	add_name(t1, l7, f5);
-	add_name(t2, l1, f1);
-	add_name(t2, l2, f2);
-	add_name(t2, l5, f5);
-	add_name(t2, l6, f4);
-	add_name(t2, l7, f5);
-	add_name(t2, l3, f3);
-	add_name(t2, l4, f4);
-
-	printf("t1:\n");
-	print_tape(t1);
-	printf("t2:\n");
-	print_tape(t2);
-	t3 = merge_tapes(t1, t2);
-	printf("t3:\n");
-	print_tape(t3);
-	t3 = sort_tape(t3);
-	printf("t3:\n");
-	print_tape(t3);
-
-	free_tape(t1);
-	free_tape(t2);
-	free_tape(t3);
-	
-
-	printf("tape allocs: %d\n", tape_allocs);
-	printf("run allocs: %d\n", run_allocs);
-	printf("value allocs: %d\n", value_allocs);
-	printf("tape frees: %d\n", tape_frees);
-	printf("run frees: %d\n", run_frees);
-	printf("value frees: %d\n", value_frees);
-  */
-  //print_out_file();
+  save_tape_to_file(tape);
 
 	return 0;
 }
