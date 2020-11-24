@@ -1,27 +1,11 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include "sbd.h"
 
-#define FIRST_NAME_LEN 10
-#define LAST_NAME_LEN 20
-
-struct Value
-{
-	char *first_name;
-	char *last_name;
-	Value *next = NULL;
-};
-
-struct Run
-{
-	Value *first = NULL;
-	Run *next = NULL;
-};
-
-struct Tape
-{
-	Run *first = NULL;
-};
+int tape_allocs = 0;
+int run_allocs = 0;
+int value_allocs = 0;
+int tape_frees = 0;
+int run_frees = 0;
+int value_frees = 0;
 
 void print_tape(Tape *tape)
 {
@@ -80,61 +64,59 @@ Value *get_last_value(Tape *tape)
 	return last_value;
 }
 
-int compare_values(char *a, char *b)
+int compare_values(Value *a, Value *b)
 {
-	int last_name_cmp = memcmp(a, b, LAST_NAME_LEN);
-	if (last_name_cmp < 0)
-	{
-		return
+	int last_name_cmp = memcmp(a->last_name, b->last_name, LAST_NAME_LEN);
+	if (last_name_cmp < 0) {
+		return -1;
 	}
-	else if (last_name_cmp == 0)
-	{
+	else if (last_name_cmp == 0) {
 
-		int first_name_cmp = memcmp(last_value->first_name, new_value->first_name, FIRST_NAME_LEN);
-		if (first_name_cmp <= 0)
-		{
-			last_value->next = new_value;
-			return;
+		int first_name_cmp = memcmp(a->first_name, b->first_name, FIRST_NAME_LEN);
+		if (first_name_cmp < 0) {
+			return -1;
+		} else if (first_name_cmp == 0) {
+			return 0;
 		}
 	}
+	return 1;
 }
 
-void add_name(Tape *tape, char *first_name, char *last_name)
+void add_name(Tape *tape, char *last_name, char *first_name)
 {
+	if (tape == NULL) {
+		return;
+	}
+
 	Run *last_run = get_last_run(tape);
 	Value *new_value = (Value *)calloc(1, sizeof(Value));
 	new_value->first_name = first_name;
 	new_value->last_name = last_name;
+
+	value_allocs++;
 
 	if (last_run == NULL)
 	{
 		Run *new_run = (Run *)calloc(1, sizeof(Run));
 		new_run->first = new_value;
 		tape->first = new_run;
+
+		run_allocs++;
 		return;
 	}
 
 	Value *last_value = get_last_value(tape);
-	int last_name_cmp = memcmp(last_value->last_name, new_value->last_name, LAST_NAME_LEN);
-	if (last_name_cmp < 0)
-	{
+	int comp = compare_values(last_value, new_value);
+	if(comp <= 0) {
 		last_value->next = new_value;
 		return;
-	}
-	else if (last_name_cmp == 0)
-	{
-
-		int first_name_cmp = memcmp(last_value->first_name, new_value->first_name, FIRST_NAME_LEN);
-		if (first_name_cmp <= 0)
-		{
-			last_value->next = new_value;
-			return;
-		}
 	}
 
 	Run *new_run = (Run *)calloc(1, sizeof(Run));
 	new_run->first = new_value;
 	last_run->next = new_run;
+
+	run_allocs++;
 }
 
 void free_run(Run *run)
@@ -144,6 +126,7 @@ void free_run(Run *run)
 	if (run->first == NULL)
 	{
 		free(run);
+		run_frees++;
 		return;
 	}
 
@@ -152,6 +135,8 @@ void free_run(Run *run)
 	{
 		free(to_free);
 		free(run);
+		value_frees++;
+		run_frees++;
 		return;
 	}
 
@@ -159,13 +144,16 @@ void free_run(Run *run)
 	while (next->next != NULL)
 	{
 		free(to_free);
+		value_frees++;
 		to_free = next;
 		next = to_free->next;
 	}
 
 	free(to_free);
 	free(next);
+	value_frees+=2;
 	free(run);
+	run_frees++;
 }
 
 void free_tape(Tape *tape)
@@ -174,7 +162,9 @@ void free_tape(Tape *tape)
 
 	if (tape->first == NULL)
 	{
+		printf("%d tape free\n", tape);
 		free(tape);
+		tape_frees++;
 		return;
 	}
 
@@ -182,7 +172,9 @@ void free_tape(Tape *tape)
 	if (to_free->next == NULL)
 	{
 		free_run(to_free);
+		printf("%d tape free\n", tape);
 		free(tape);
+		tape_frees++;
 		return;
 	}
 
@@ -197,14 +189,12 @@ void free_tape(Tape *tape)
 	free_run(to_free);
 	free_run(next);
 	free(tape);
+	printf("%d tape free\n", tape);
+	tape_frees++;
 }
 
 Run *merge_runs(Run *run1, Run *run2)
 {
-	Run *new_run = (Run *)calloc(1, sizeof(Run));
-	Value *last_value;
-	int last_name_cmp;
-	int first_name_cmp;
 
 	if (run1 == NULL && run2 == NULL)
 	{
@@ -219,7 +209,14 @@ Run *merge_runs(Run *run1, Run *run2)
 		return run1;
 	}
 
-	if (run1->first->num < run2->first->num)
+	Run *new_run = (Run *)calloc(1, sizeof(Run));
+	Value *last_value;
+	int name_cmp;
+
+	run_allocs++;
+
+	name_cmp = compare_values (run1->first, run2->first);
+	if (name_cmp <= 0)
 	{
 		new_run->first = run1->first;
 		run1->first = run1->first->next;
@@ -234,7 +231,8 @@ Run *merge_runs(Run *run1, Run *run2)
 	last_value = new_run->first;
 	while (run1->first != NULL && run2->first != NULL)
 	{
-		if (run1->first->num < run2->first->num)
+		name_cmp = compare_values (run1->first, run2->first);
+		if (name_cmp <= 0)
 		{
 			last_value->next = run1->first;
 			run1->first = run1->first->next;
@@ -256,6 +254,8 @@ Run *merge_runs(Run *run1, Run *run2)
 		last_value = last_value->next;
 		last_value->next = NULL;
 	}
+	free_run(run1);
+	free_run(run2);
 	return new_run;
 }
 
@@ -276,79 +276,208 @@ Tape *sort_tape(Tape *tape)
 		return tape;
 	}
 
-	Tape temp_tapes[2];
+	Tape *tape1 = (Tape *)calloc(1, sizeof(Tape));
+	Tape *tape2 = (Tape *)calloc(1, sizeof(Tape));
+	tape_allocs+=2;
 	int i = 0;
 
-	temp_tapes[0].first = tape->first;
+	tape1->first = tape->first;
 	tape->first = tape->first->next;
-	temp_tapes[0].first->next = NULL;
+	tape1->first->next = NULL;
 
-	temp_tapes[1].first = tape->first;
+	tape2->first = tape->first;
 	tape->first = tape->first->next;
-	temp_tapes[1].first->next = NULL;
+	tape2->first->next = NULL;
 
 	if (tape != NULL)
 	{
 		while (tape->first != NULL)
 		{
-			Run *run = get_last_run(&temp_tapes[i]);
+			Run *run;
+			if(!i) {
+				run = get_last_run(tape1);
+			} else {
+				run = get_last_run(tape2);
+			}
 			run->next = tape->first;
 			tape->first = tape->first->next;
 			run->next->next = NULL;
 			i = !i;
 		}
 	}
-	//tape->first = merge_runs(temp_tapes[0].first, temp_tapes[1].first);
-	temp_tapes[0].first = temp_tapes[0].first->next;
-	temp_tapes[1].first = temp_tapes[1].first->next;
-	while (temp_tapes[0].first != NULL && temp_tapes[1].first != NULL)
-	{
-		Run *next_run = get_last_run(tape);
-		//next_run->next = merge_runs(temp_tapes[0].first, temp_tapes[1].first);
-		temp_tapes[0].first = temp_tapes[0].first->next;
-		temp_tapes[1].first = temp_tapes[1].first->next;
-	}
+	tape = merge_tapes(tape1, tape2);
 
 	return tape;
 }
 
+Tape * merge_tapes(Tape *tape1, Tape *tape2)
+{
+	if (tape1 == NULL && tape2 == NULL) {
+		return NULL;
+	}
+	if (tape1 == NULL) {
+		return tape2;
+	}
+	if (tape2 == NULL) {
+		return tape1;
+	}
+
+	Tape *new_tape = (Tape *)calloc(1, sizeof(Tape));
+	printf("%d tape alloc\n", new_tape);
+	tape_allocs++;
+	new_tape->first = merge_runs(tape1->first, tape2->first);
+	tape1->first = tape1->first->next;
+	tape2->first = tape2->first->next;
+	while (tape1->first != NULL && tape2->first != NULL)
+	{
+		Run *next_run = get_last_run(new_tape);
+		next_run->next = merge_runs(tape1->first, tape2->first);
+		tape1->first = tape1->first->next;
+		tape2->first = tape2->first->next;
+	}
+	Run *next_run = get_last_run(new_tape);
+	next_run->next = merge_runs(tape1->first, tape2->first);
+
+	return new_tape;
+}
+
+void print_out_file()
+{
+	FILE *file;
+	char *f_name = (char *)calloc(FIRST_NAME_LEN + 1, sizeof(char));
+	char *l_name = (char *)calloc(LAST_NAME_LEN + 1, sizeof(char));
+
+	file = fopen("names.data", "r");
+	f_name[FIRST_NAME_LEN] = '\0';
+	l_name[LAST_NAME_LEN] = '\0';
+
+	while (1) {
+		int read_bytes;
+
+		read_bytes = fread(f_name, sizeof(char), FIRST_NAME_LEN, file);
+		if (!read_bytes) {
+			break;
+		}
+
+		read_bytes = fread(l_name, sizeof(char), LAST_NAME_LEN, file);
+		if (!read_bytes) {
+			break;
+		}
+
+		printf("%s %s\n", f_name, l_name);
+	}
+
+	free(f_name);
+	free(l_name);
+	fclose(file);
+}
+
+Tape * load_file() {
+	Tape *t1 = (Tape*)calloc(1, sizeof(Tape));
+	FILE *file;
+	
+
+	file = fopen("names.data", "r");
+	
+
+	while (1) {
+		int read_bytes; 
+		char *f_name = (char *)calloc(FIRST_NAME_LEN + 1, sizeof(char));
+		char *l_name = (char *)calloc(LAST_NAME_LEN + 1, sizeof(char));
+		f_name[FIRST_NAME_LEN] = '\0';
+		l_name[LAST_NAME_LEN] = '\0';
+
+		read_bytes = fread(f_name, sizeof(char), FIRST_NAME_LEN, file);
+		if (!read_bytes) {
+			break;
+		}
+
+		read_bytes = fread(l_name, sizeof(char), LAST_NAME_LEN, file);
+		if (!read_bytes) {
+			break;
+		}
+
+		add_name(t1, l_name, f_name);
+	}
+
+	fclose(file);
+	return t1;
+}
+
 int main()
 {
-	/*int arr[] = { 44, 55, 12, 42, 94, 18, 06, 67 };
-	Tape *t1 = (Tape*)calloc(1, sizeof(Tape));
+  Tape *tape = load_file();
 
-	for (int i = 0; i < sizeof(arr) / sizeof(int); i++) {
-		add_num(t1, arr[i]);
-	}
+  int num = 0;
+  printf("Before sorting:\n");
+	print_tape(tape);
+  while(tape->first->next != NULL) {
+    num++;
+	  tape = sort_tape(tape);
+    printf("%d sorts:\n", num);
+	  print_tape(tape);
+  }
+  //print_tape(tape);
+	/*Tape *t1 = (Tape*)calloc(1, sizeof(Tape));
+	Tape *t2 = (Tape*)calloc(1, sizeof(Tape));
+	Tape *t3 = (Tape*)calloc(1, sizeof(Tape));
+	printf("%d tape alloc\n", t1);
+	printf("%d tape alloc\n", t2);
+	printf("%d tape alloc\n", t3);
+	tape_allocs+=3;
 
+	char *f1 = "jan";
+	char *f2 = "dan";
+	char *f3 = "man";
+	char *f4 = "kan";
+	char *f5 = "man";
+	char *l1 = "nowak";
+	char *l2 = "nowak";
+	char *l3 = "aronia";
+	char *l4 = "kowalski";
+	char *l5 = "kowalski";
+	char *l6 = "aronia";
+	char *l7 = "aronia";
+
+	add_name(t1, l1, f1);
+	add_name(t1, l2, f2);
+	add_name(t1, l3, f3);
+	add_name(t1, l4, f4);
+	add_name(t1, l5, f5);
+	add_name(t1, l6, f4);
+	add_name(t1, l7, f5);
+	add_name(t2, l1, f1);
+	add_name(t2, l2, f2);
+	add_name(t2, l5, f5);
+	add_name(t2, l6, f4);
+	add_name(t2, l7, f5);
+	add_name(t2, l3, f3);
+	add_name(t2, l4, f4);
+
+	printf("t1:\n");
 	print_tape(t1);
+	printf("t2:\n");
+	print_tape(t2);
+	t3 = merge_tapes(t1, t2);
+	printf("t3:\n");
+	print_tape(t3);
+	t3 = sort_tape(t3);
+	printf("t3:\n");
+	print_tape(t3);
 
-	sort_tape(t1);
+	free_tape(t1);
+	free_tape(t2);
+	free_tape(t3);
+	
 
-	print_tape(t1);
-	sort_tape(t1);
-
-	print_tape(t1);
-
-	free_tape(t1);*/
-
-	char a[10] = "malaga";
-	char b[10] = "aslaga";
-
-	int result = memcmp(a, b, 6);
-
-	if (result > 0)
-	{
-		printf("%s\n%s\n", b, a);
-	}
-	else if (result < 0)
-	{
-		printf("%s\n%s\n", a, b);
-	}
-	else
-	{
-		printf("ruwne\n");
-	}
+	printf("tape allocs: %d\n", tape_allocs);
+	printf("run allocs: %d\n", run_allocs);
+	printf("value allocs: %d\n", value_allocs);
+	printf("tape frees: %d\n", tape_frees);
+	printf("run frees: %d\n", run_frees);
+	printf("value frees: %d\n", value_frees);
+  */
+  //print_out_file();
 
 	return 0;
 }
