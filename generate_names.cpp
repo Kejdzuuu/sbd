@@ -7,8 +7,23 @@
 #define LAST_NAME_LEN 16
 #define DEFAULT_NAME_COUNT 25
 
+char first_names[][FIRST_NAME_LEN] = {
+  "james", "mary", "john", "patricia", "robert", "jennifer",
+  "michael", "linda", "william", "elizabeth", "david", "barbara"
+};
+
+char last_names[][LAST_NAME_LEN] = {
+  "smith", "johnson", "williams", "jones", "brown", "davis",
+  "miller", "wilson", "moore", "taylor", "anderson", "thomas"
+};
+
+#define NELEMS(x)  (sizeof(x) / sizeof((x)[0]))
+#define FIRST_NAMES_SIZE NELEMS(first_names)
+#define LAST_NAMES_SIZE NELEMS(last_names)
+
+
 int generate_number(int min, int max) {
-  int delta = max - min + 1;
+  int delta = max - min;
 
   return rand()%delta + min;
 }
@@ -19,21 +34,14 @@ char generate_char() {
   return c;
 }
 
-void generate_name(char **f_name, char **l_name) {
-  int fnlen, lnlen;
+void generate_name(char *f_name, char *l_name) {
+  int f_name_index, l_name_index;
 
-  fnlen = generate_number(3, FIRST_NAME_LEN);
-  lnlen = generate_number(5, LAST_NAME_LEN);
+  f_name_index = generate_number(0, FIRST_NAMES_SIZE);
+  l_name_index = generate_number(0, LAST_NAMES_SIZE);
 
-  for(int i = 0; i < fnlen; i++){
-    (*f_name)[i] = generate_char();
-  }
-  (*f_name)[fnlen] = '\0';
-
-  for(int i = 0; i < lnlen; i++){
-    (*l_name)[i] = generate_char();
-  }
-  (*l_name)[lnlen] = '\0';
+  memcpy (f_name, first_names[f_name_index], FIRST_NAMES_SIZE);
+  memcpy (l_name, last_names[l_name_index], LAST_NAMES_SIZE);
 }
 
 int main(int argc, char *argv[]) {
@@ -52,13 +60,15 @@ int main(int argc, char *argv[]) {
   srand(seed);
 
   for(int i = 0; i < DEFAULT_NAME_COUNT; i++) {
-    generate_name(&first_name, &last_name);
+    generate_name(first_name, last_name);
     fwrite(last_name, sizeof(char), LAST_NAME_LEN, file);
     fwrite(first_name, sizeof(char), FIRST_NAME_LEN, file);
     printf("%s %s\n", last_name, first_name);
   }
 
   fclose(file);
+
+  printf("%d %d\n", FIRST_NAMES_SIZE, LAST_NAMES_SIZE);
   
   if(argc == 2) {
     printf("Generating %d names\n", strtol(argv[1], NULL, 10));
