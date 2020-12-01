@@ -312,8 +312,8 @@ Tape *sort_tape(Tape *tape)
       i = !i;
     }
   }
-  save_tape_to_file(tape1, tape_file1);
-  save_tape_to_file(tape2, tape_file2);
+  //save_tape_to_file(tape1, tape_file1);
+  //save_tape_to_file(tape2, tape_file2);
   tape = merge_tapes(tape1, tape2);
 
   return tape;
@@ -486,12 +486,16 @@ void save_run(Record *run, int size, int n) {
 
   char name[] = "run000";
   name[3] = '0' + n / 100;
-  name[4] = '0' + n / 10;
-  name[5] = '0' + n;
+  name[4] = '0' + (n % 100) / 10;
+  name[5] = '0' + n % 10;
 
   file = fopen(name, "w");
 
   fwrite(run, sizeof(Record), size, file);
+  disk_saves += size / RECORDS_IN_PAGE;
+  if (size % RECORDS_IN_PAGE) {
+    disk_saves++;
+  }
 
   fclose(file);
 }
@@ -499,7 +503,7 @@ void save_run(Record *run, int size, int n) {
 void load_file(const char name[]) {
   FILE *file;
   Record records[MAX_RUN];
-  run_count_global = 0;
+  int runs = 0;
 
   file = fopen(name, "r");
 
@@ -510,16 +514,38 @@ void load_file(const char name[]) {
     if (!read_records) {
       break;
     }
+    disk_reads += read_records / RECORDS_IN_PAGE;
+    if (read_records % RECORDS_IN_PAGE) {
+      disk_reads++;
+    }
 
     heap_sort_records(records, read_records);
-    print_records(records, read_records);
-    save_run(records, read_records, run_count_global);
-    run_count_global++;
-    printf("\n");
+    //print_records(records, read_records);
+    save_run(records, read_records, runs);
+    runs++;
+    if(runs == 999) {
+      printf ("Too many runs!\n");
+      return;
+    }
   }
-  int runs = run_count_global;
+  int sorts = 0;
   do {
     runs = merge_runs(runs);
+    sorts++;
+    if (runs){
+      printf("Po %d fazie sortowania. Wyświetlić taśmy? [Y/n]", sorts);
+      while((getchar())!='\n');
+      char c = getchar();
+      if (c == 'Y' || c == 'y') {
+        for (int i = 0; i < runs; i++) {
+          char name[] = "run000";
+          name[3] = '0' + i / 100;
+          name[4] = '0' + (i % 100) / 10;
+          name[5] = '0' + i % 10;
+          print_out_file(name);
+        }
+      }
+    }
   } while (runs);
 
   fclose(file);
@@ -533,28 +559,28 @@ int merge_runs(int run_count) {
   //Record output_records[BUFFERS_AVAILABLE];
   int records_left_in_run[BUFFERS_AVAILABLE - 1];
   int current_run_index[BUFFERS_AVAILABLE - 1];
-  int runs_left = run_count_global;
+  int runs_left = run_count;
   int runs_loaded = 0;
   int merge_count = 0;
-  run_count_global = 0;
+  run_count = 0;
   Record inf_record;
   inf_record.last_name[0] = 0xff;
 
   // keep loading runs until none left
   while (runs_left) {
     char out_name[] = "mrg000";
-    out_name[3] = '0' + run_count_global / 100;
-    out_name[4] = '0' + run_count_global / 10;
-    out_name[5] = '0' + run_count_global;
+    out_name[3] = '0' + run_count / 100;
+    out_name[4] = '0' + (run_count % 100) / 10;
+    out_name[5] = '0' + run_count % 10;
 
-    run_count_global++;
+    run_count++;
 
     if (runs_left == 1) {
       char run_name[] = "run000";
       int run_num = merge_count * (BUFFERS_AVAILABLE - 1);
       run_name[3] = '0' + run_num / 100;
-      run_name[4] = '0' + run_num / 10;
-      run_name[5] = '0' + run_num;
+      run_name[4] = '0' + (run_num % 100) / 10;
+      run_name[5] = '0' + run_num % 10;
       remove(out_name);
       rename(run_name, out_name);
       merge_count++;
@@ -575,8 +601,8 @@ int merge_runs(int run_count) {
       int run_num = merge_count * (BUFFERS_AVAILABLE - 1) + i;
       char name[] = "run000";
       name[3] = '0' + run_num / 100;
-      name[4] = '0' + run_num / 10;
-      name[5] = '0' + run_num;
+      name[4] = '0' + (run_num % 100) / 10;
+      name[5] = '0' + run_num % 10;
       in_files[i] = fopen(name, "r");
     }
 
@@ -594,6 +620,9 @@ int merge_runs(int run_count) {
         records_loaded = fread(&input_records[i * RECORDS_IN_PAGE], sizeof(Record), RECORDS_IN_PAGE, in_files[i]);  // part of run loaded
         records_left_in_run[i] = records_loaded;  // records loaded from run
         current_run_index[i] = 0;
+        if (records_loaded) {
+          disk_reads++;
+        }
       }
 
       for (int i = 0; i < runs_loaded; i++) {
@@ -603,8 +632,15 @@ int merge_runs(int run_count) {
         heap_insert(output_records, heap_size, i);
       }
 
+      Record ordered_records[RECORDS_IN_PAGE];
+      int ordered_records_index = 0;
+
       while (heap_size) {
-        fwrite(output_records->record, sizeof(Record), 1, out_file);
+        //fwrite(output_records->record, sizeof(Record), 1, out_file);
+
+        memcpy(&ordered_records[ordered_records_index], output_records->record, sizeof(Record));
+        ordered_records_index++;
+
         current_run_index[output_records->index]++;
         records_left_in_run[output_records->index]--;
         if (records_left_in_run[output_records->index] > 0) {
@@ -616,6 +652,10 @@ int merge_runs(int run_count) {
           records_loaded = fread(&input_records[i * RECORDS_IN_PAGE], sizeof(Record), RECORDS_IN_PAGE, in_files[i]);  // part of run loaded
           records_left_in_run[i] = records_loaded;  // records loaded from run
           current_run_index[i] = 0;
+          if (records_loaded) {
+            disk_reads++;
+          }
+
           if (records_left_in_run[output_records->index] > 0) {
             output_records[0].record = &input_records[i * RECORDS_IN_PAGE];
             heapify(output_records, heap_size, 0);
@@ -625,12 +665,25 @@ int merge_runs(int run_count) {
             heapify(output_records, heap_size, 0);
           }
         }
+
+        if (ordered_records_index == RECORDS_IN_PAGE || heap_size == 0) {
+          fwrite(ordered_records, sizeof(Record), ordered_records_index, out_file);
+          printf("records saved: %d\n", ordered_records_index);
+          ordered_records_index = 0;
+          disk_saves++;
+        }
       }
 
     } while (heap_size);
 
     for (int i = 0; i < runs_loaded; i++) {
       fclose(in_files[i]);
+      int run_num = merge_count * (BUFFERS_AVAILABLE - 1) + i;
+      char name[] = "run000";
+      name[3] = '0' + run_num / 100;
+      name[4] = '0' + (run_num % 100) / 10;
+      name[5] = '0' + run_num % 10;
+      remove(name);
     }
     fclose(out_file);
     runs_left = runs_left - runs_loaded;
@@ -638,15 +691,16 @@ int merge_runs(int run_count) {
   }
 
   if (merge_count > 1) {
+    printf("merge count: %d\n", merge_count);
     for (int i = 0; i < merge_count; i++) {
       char merge_name[] = "mrg000";
       merge_name[3] = '0' + i / 100;
-      merge_name[4] = '0' + i / 10;
-      merge_name[5] = '0' + i;
+      merge_name[4] = '0' + (i % 100) / 10;
+      merge_name[5] = '0' + i % 10;
       char run_name[] = "run000";
       run_name[3] = '0' + i / 100;
-      run_name[4] = '0' + i / 10;
-      run_name[5] = '0' + i;
+      run_name[4] = '0' + (i % 100) / 10;
+      run_name[5] = '0' + i % 10;
 
       remove(run_name);
       rename(merge_name, run_name);
@@ -654,6 +708,14 @@ int merge_runs(int run_count) {
     return merge_count;
   }
   else {
+    for(int i = 0; i < runs_loaded; i++) {
+      char run_name[] = "run000";
+      run_name[3] = '0' + i / 100;
+      run_name[4] = '0' + (i % 100) / 10;
+      run_name[5] = '0' + i % 10;
+
+      remove(run_name);
+    }
     remove("sorted.data");
     rename("mrg000", "sorted.data");
     return 0;
@@ -689,8 +751,16 @@ void save_tape_to_file(Tape *tape, const char name[]) {
 
 int main()
 {
+  char name[MAX_FILE_NAME_LEN];
+  disk_reads = 0;
+  disk_saves = 0;
+  printf("Podaj nazwe pliku: \n");
+  scanf("%s", name);
   load_file("names.data");
-  print_out_file("sorted.data");
+  //print_out_file("sorted.data");
+
+  printf("disk reads: %d\n", disk_reads);
+  printf("disk saves: %d\n", disk_saves);
 
   return 0;
 }

@@ -49,7 +49,15 @@ int main(int argc, char *argv[]) {
   char *last_name = (char *)calloc(LAST_NAME_LEN + 1, sizeof(char));
   int seed;
   time_t t;
+  int number_of_names;
   FILE *file;
+
+  if(argc == 2) {
+    number_of_names = strtol(argv[1], NULL, 10);
+  } else {
+    number_of_names = DEFAULT_NAME_COUNT;
+  }
+  printf("Generating %d names\n", number_of_names);
 
   first_name[FIRST_NAME_LEN] = '\0';
   last_name[LAST_NAME_LEN] = '\0';
@@ -59,7 +67,7 @@ int main(int argc, char *argv[]) {
   seed = time(&t);
   srand(seed);
 
-  for(int i = 0; i < DEFAULT_NAME_COUNT; i++) {
+  for(int i = 0; i < number_of_names; i++) {
     generate_name(first_name, last_name);
     fwrite(last_name, sizeof(char), LAST_NAME_LEN, file);
     fwrite(first_name, sizeof(char), FIRST_NAME_LEN, file);
@@ -67,13 +75,5 @@ int main(int argc, char *argv[]) {
   }
 
   fclose(file);
-
-  printf("%d %d\n", FIRST_NAMES_SIZE, LAST_NAMES_SIZE);
-  
-  if(argc == 2) {
-    printf("Generating %d names\n", strtol(argv[1], NULL, 10));
-  } else {
-    printf("Generating %d names\n", DEFAULT_NAME_COUNT);
-  }
   return 0;
 }

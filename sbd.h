@@ -3,17 +3,12 @@
 #include <string.h>
 
 #define FIRST_NAME_LEN 16
-#define LAST_NAME_LEN 16
+#define LAST_NAME_LEN FIRST_NAME_LEN
+#define MAX_FILE_NAME_LEN 128
 #define PAGE_SIZE 4096
-#define RECORDS_IN_PAGE 15 //128
-#define BUFFERS_AVAILABLE 30 //100
+#define RECORDS_IN_PAGE 128
+#define BUFFERS_AVAILABLE 10
 #define MAX_RUN (RECORDS_IN_PAGE * BUFFERS_AVAILABLE)
-
-const char tape_file1[] = "tape1.tp";
-const char tape_file2[] = "tape2.tp";
-const char tape_file3[] = "tape3.tp";
-
-int run_count_global;
 
 struct Value
 {
@@ -56,3 +51,6 @@ void save_tape_to_file(Tape *tape, const char name[]);
 void load_file(const char name[]);
 
 int merge_runs(int runs);
+
+int disk_reads;
+int disk_saves;
