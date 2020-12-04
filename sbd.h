@@ -1,21 +1,30 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #define FIRST_NAME_LEN 16
 #define LAST_NAME_LEN FIRST_NAME_LEN
 #define MAX_FILE_NAME_LEN 128
 #define PAGE_SIZE 4096
 #define RECORDS_IN_PAGE 128
-#define BUFFERS_AVAILABLE 10
+#define BUFFERS_AVAILABLE 16
 #define MAX_RUN (RECORDS_IN_PAGE * BUFFERS_AVAILABLE)
 
-struct Value
-{
-  char *first_name;
-  char *last_name;
-  Value *next = NULL;
+char first_names[][FIRST_NAME_LEN] = {
+  "james", "mary", "john", "patricia", "robert", "jennifer",
+  "michael", "linda", "william", "elizabeth", "david", "barbara"
 };
+
+char last_names[][LAST_NAME_LEN] = {
+  "smith", "johnson", "williams", "jones", "brown", "davis",
+  "miller", "wilson", "moore", "taylor", "anderson", "thomas"
+};
+
+#define NELEMS(x)  (sizeof(x) / sizeof((x)[0]))
+#define FIRST_NAMES_SIZE NELEMS(first_names)
+#define LAST_NAMES_SIZE NELEMS(last_names)
+
 
 struct Record
 {
@@ -29,28 +38,16 @@ struct Record_with_index
   int index;
 };
 
-struct Run
-{
-  Value *first = NULL;
-  Run *next = NULL;
-};
 
-struct Tape
-{
-  Run *first = NULL;
-};
+void sort_file(const char name[]);
 
-Run * merge_runs(Run *run1, Run *run2);
+void print_out_file(const char name[]);
 
-Tape * sort_tape(Tape *tape);
+int merge_runs(int runs, const char name[]);
 
-Tape * merge_tapes(Tape *tape1, Tape *tape2);
-
-void save_tape_to_file(Tape *tape, const char name[]);
-
-void load_file(const char name[]);
-
-int merge_runs(int runs);
+char get_user_input();
 
 int disk_reads;
 int disk_saves;
+int records_read;
+int records_saved;

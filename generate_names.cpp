@@ -24,13 +24,11 @@ char last_names[][LAST_NAME_LEN] = {
 
 int generate_number(int min, int max) {
   int delta = max - min;
-
   return rand()%delta + min;
 }
 
 char generate_char() {
   char c = (char)generate_number((int)'a', (int)'z');
-
   return c;
 }
 
